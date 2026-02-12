@@ -11,7 +11,7 @@ from typing import Optional, List, Dict
 import aiohttp
 import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig, logger
-from astrbot.api.event import AstrMessageEvent, filter, MessageChain
+from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
 
@@ -51,7 +51,9 @@ class XPornPlugin(Star):
     async def xporn_main(self, event: AstrMessageEvent, args: str = ""):
         """xporn 主命令"""
         # 调试日志：查看原始参数
-        logger.info(f"[DEBUG] 原始 args repr: {repr(args)} (len: {len(args) if args else 0})")
+        logger.info(
+            f"[DEBUG] 原始 args repr: {repr(args)} (len: {len(args) if args else 0})"
+        )
 
         # 使用更健壮的方式分割参数
         if args:
@@ -69,7 +71,9 @@ class XPornPlugin(Star):
         action = parts[0].lower()
         remaining_args = parts[1:] if len(parts) > 1 else []
 
-        logger.info(f"[DEBUG] action='{action}', remaining_args={remaining_args}, 长度={len(remaining_args)}")
+        logger.info(
+            f"[DEBUG] action='{action}', remaining_args={remaining_args}, 长度={len(remaining_args)}"
+        )
 
         if action in ("help", "h"):
             yield event.plain_result(self.get_help_text())
@@ -167,7 +171,8 @@ class XPornPlugin(Star):
             if not video:
                 yield event.plain_result("❌ 未找到该视频")
                 return
-            yield event.plain_result(self.format_video_detail(video))
+            chain = self.build_video_detail_chain(video)
+            yield event.chain_result(chain)
         except Exception as e:
             logger.error(f"获取视频详情失败: {e}")
             yield event.plain_result(f"❌ 获取视频详情失败: {str(e)}")
@@ -225,7 +230,7 @@ class XPornPlugin(Star):
             "sort": sort,
             "category": "",
             "range": "",
-            "isAnimeOnly": 0
+            "isAnimeOnly": 0,
         }
         try:
             async with self.session.get(url, params=params) as resp:
@@ -252,18 +257,18 @@ class XPornPlugin(Star):
         if not videos:
             return []
 
-        keyword_lower = keyword.lower()
+        keyword_lower = keyword.lower() if keyword else ""
         results = []
 
         for v in videos:
             # 搜索标题（Twitter 账户名）
-            title = v.get("title", "")
+            title = v.get("title") or ""
             if keyword_lower in title.lower():
                 results.append(v)
                 continue
 
             # 搜索视频 ID
-            movie_id = v.get("movieId", "")
+            movie_id = v.get("movieId") or ""
             if keyword_lower in movie_id.lower():
                 results.append(v)
 
@@ -292,7 +297,7 @@ class XPornPlugin(Star):
             "sort": "favorite",
             "category": "",
             "range": "",
-            "isAnimeOnly": 0
+            "isAnimeOnly": 0,
         }
         try:
             async with self.session.get(url, params=params) as resp:
@@ -336,7 +341,9 @@ class XPornPlugin(Star):
                 "duration": duration,
                 "likes": int(item.get("favorite", 0)),
                 "views": int(item.get("pv", 0)),
-                "comments": int(item.get("_count", {}).get("comments", 0)) if item.get("_count") else 0,
+                "comments": int(item.get("_count", {}).get("comments", 0))
+                if item.get("_count")
+                else 0,
                 "tweet_url": item.get("tweet_url", ""),
             }
             videos.append(video)
@@ -403,6 +410,11 @@ class XPornPlugin(Star):
             movie_id = video.get("movieId", "")
             thumbnail = video.get("thumbnail", "")
 
+            # 先图片
+            if thumbnail:
+                chain.append(Comp.Image.fromURL(thumbnail))
+
+            # 再文字
             info = f"\n{i}. {title}"
             if duration:
                 info += f"\n   ⏱️ {duration}  👁️ {self.format_number(views)}"
@@ -410,10 +422,8 @@ class XPornPlugin(Star):
                 info += f"\n   🆔 {movie_id}"
 
             chain.append(Comp.Plain(info))
-            if thumbnail:
-                chain.append(Comp.Image.fromURL(thumbnail))
 
-        chain.append(Comp.Plain("\n💡 使用 'xporn info <id>' 查看详情"))
+        chain.append(Comp.Plain("\n💡 使用 'xporn_info <id>' 查看详情"))
         return chain
 
     def build_hot_videos_chain(self, videos: List[Dict]) -> List:
@@ -427,14 +437,17 @@ class XPornPlugin(Star):
             movie_id = video.get("movieId", "")
             thumbnail = video.get("thumbnail", "")
 
+            # 先图片
+            if thumbnail:
+                chain.append(Comp.Image.fromURL(thumbnail))
+
+            # 再文字
             info = f"\n{i}. {title}"
             info += f"\n   ❤️ {self.format_number(likes)}  👁️ {self.format_number(views)}"
             if movie_id:
                 info += f"\n   🆔 {movie_id}"
 
             chain.append(Comp.Plain(info))
-            if thumbnail:
-                chain.append(Comp.Image.fromURL(thumbnail))
 
         return chain
 
@@ -448,6 +461,11 @@ class XPornPlugin(Star):
             movie_id = video.get("movieId", "")
             thumbnail = video.get("thumbnail", "")
 
+            # 先图片
+            if thumbnail:
+                chain.append(Comp.Image.fromURL(thumbnail))
+
+            # 再文字
             info = f"\n{i}. {title}"
             if duration:
                 info += f"\n   ⏱️ {duration}"
@@ -455,18 +473,22 @@ class XPornPlugin(Star):
                 info += f"\n   🆔 {movie_id}"
 
             chain.append(Comp.Plain(info))
-            if thumbnail:
-                chain.append(Comp.Image.fromURL(thumbnail))
 
         return chain
 
     def build_video_detail_chain(self, video: Dict) -> List:
         """构建视频详情消息链"""
-        chain = [Comp.Plain("📄 视频详情")]
+        chain = []
 
+        # 先添加图片
+        if video.get("thumbnail"):
+            chain.append(Comp.Image.fromURL(video["thumbnail"]))
+
+        # 再添加标题
         title = video.get("title", "未知标题")
-        chain.append(Comp.Plain(f"\n📌 标题: {title}"))
+        chain.append(Comp.Plain(f"📄 视频详情\n📌 标题: {title}"))
 
+        # 添加其他信息
         if video.get("duration"):
             chain.append(Comp.Plain(f"⏱️ 时长: {video['duration']}"))
         if video.get("views"):
@@ -479,9 +501,6 @@ class XPornPlugin(Star):
 
         if video.get("url"):
             chain.append(Comp.Plain(f"\n🔗 链接: {video['url']}"))
-
-        if video.get("thumbnail"):
-            chain.append(Comp.Image.fromURL(video["thumbnail"]))
 
         return chain
 
@@ -591,7 +610,9 @@ class XPornPlugin(Star):
 
         return "\n".join(lines)
 
-    def format_search_results_with_images(self, videos: List[Dict], keyword: str) -> List[str]:
+    def format_search_results_with_images(
+        self, videos: List[Dict], keyword: str
+    ) -> List[str]:
         """格式化搜索结果（带图片）"""
         result = [f"🔍 搜索结果: {keyword}"]
 
