@@ -1,3 +1,9 @@
+"""
+AstrBot X-Porn 插件
+提供 Twitter 视频排行视频查询功能
+命令前缀: xporn
+"""
+
 import random
 import re
 from typing import Optional, List, Dict
@@ -41,15 +47,15 @@ class XPornPlugin(Star):
         logger.info("XPorn 插件已卸载")
 
     @filter.command("xporn", alias=["xp"])
-    async def xporn_main(self, event: AstrMessageEvent, *args: str):
+    async def xporn_main(self, event: AstrMessageEvent, args: str = ""):
         """xporn 主命令"""
-        # 如果没有参数，显示帮助
         if not args:
             yield event.plain_result(self.get_help_text())
             return
 
-        action = args[0].lower()
-        remaining_args = args[1:]
+        parts = args.strip().split()
+        action = parts[0].lower() if parts else ""
+        remaining_args = parts[1:]
 
         if action in ("help", "h"):
             yield event.plain_result(self.get_help_text())
