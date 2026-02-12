@@ -4,7 +4,9 @@
     "description": "数据源",
     "default": "twitter",
     "obvious_hint": true,
-    "hint": "可选: twitter(只含真人视频), anime(只含动漫), mixed(混合)"
+    "hint": "选择视频数据来源",
+    "enum": ["twitter", "anime", "mixed"],
+    "enum_descriptions": ["只含真人视频", "只含动漫视频", "混合两个源"]
   },
   "mosaic_level": {
     "type": "int",

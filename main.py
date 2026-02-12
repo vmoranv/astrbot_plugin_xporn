@@ -220,8 +220,12 @@ class XPornPlugin(Star):
   xporn random       - 随机推荐视频
 
 独立命令列表:
-  xporn_search <关键词> - 搜索 Twitter 账户名（英文/数字）
+  xporn_search <关键词> - 搜索 Twitter 账户名（如: mei, cc, jl）
   xporn_info <id>      - 获取视频详情
+
+💡 搜索说明: 搜索的是视频发布者的 Twitter 账户名
+   • 账户名通常是英文/数字组合（如: jl20080, MeimeiCC2）
+   • 可尝试关键词: mei, cc, jl, hp, girl, hot 等
 
 命令别名:
   xp                - xporn 的简写
@@ -237,10 +241,12 @@ class XPornPlugin(Star):
 示例:
   xporn rank         - 获取排行榜
   xporn rank 2       - 获取排行榜第2页
-  xporn_search mei    - 搜索包含 'mei' 的账户
+  xporn_search mei    - 搜索账户名包含 'mei' 的视频
   xporn_info abc123  - 获取视频详情
 
-💡 提示: 可在插件设置中切换数据源 (twitter/anime/mixed)
+💡 提示:
+  • 搜索功能匹配的是 Twitter 账户名，不是视频内容
+  • 可在插件设置中切换数据源 (twitter/anime/mixed)
 """
 
     # ========== 数据获取方法 ==========
