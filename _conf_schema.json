@@ -1,0 +1,43 @@
+{
+  "mosaic_level": {
+    "type": "int",
+    "description": "封面打码程度",
+    "default": 0,
+    "obvious_hint": false,
+    "hint": "0=不打码, 1=轻微打码, 2=中度打码, 3=重度打码"
+  },
+  "proxy_url": {
+    "type": "string",
+    "description": "代理服务器地址",
+    "default": "",
+    "hint": "例如: http://127.0.0.1:7890, 留空则不使用代理"
+  },
+  "proxy_auth": {
+    "type": "dict",
+    "description": "代理认证（如果需要）",
+    "items": {
+      "username": {
+        "type": "string",
+        "description": "代理用户名",
+        "default": ""
+      },
+      "password": {
+        "type": "string",
+        "description": "代理密码",
+        "default": ""
+      }
+    }
+  },
+  "request_timeout": {
+    "type": "int",
+    "description": "请求超时时间（秒）",
+    "default": 15,
+    "hint": "网络请求的超时时间"
+  },
+  "max_results": {
+    "type": "int",
+    "description": "每页最大显示数量",
+    "default": 10,
+    "hint": "排行榜和搜索结果每页显示的视频数量"
+  }
+}
