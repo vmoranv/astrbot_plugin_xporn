@@ -12,22 +12,6 @@
     "default": "",
     "hint": "例如: http://127.0.0.1:7890, 留空则不使用代理"
   },
-  "proxy_auth": {
-    "type": "dict",
-    "description": "代理认证（如果需要）",
-    "items": {
-      "username": {
-        "type": "string",
-        "description": "代理用户名",
-        "default": ""
-      },
-      "password": {
-        "type": "string",
-        "description": "代理密码",
-        "default": ""
-      }
-    }
-  },
   "request_timeout": {
     "type": "int",
     "description": "请求超时时间（秒）",
