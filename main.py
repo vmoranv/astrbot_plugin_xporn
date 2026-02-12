@@ -128,43 +128,49 @@ class XPornPlugin(Star):
             except Exception as e:
                 logger.error(f"随机推荐失败: {e}")
                 yield event.plain_result(f"❌ 随机推荐失败: {str(e)}")
-        elif action == "search":
-            if not remaining_args:
-                yield event.plain_result(
-                    "❌ 请输入搜索关键词\n用法: xporn search <关键词>"
-                )
-                return
-            keyword = " ".join(remaining_args)
-            yield event.plain_result(f"🔍 正在搜索: {keyword}...")
-            try:
-                videos = await self.search_videos(keyword)
-                if not videos:
-                    yield event.plain_result(f"❌ 未找到与 '{keyword}' 相关的视频")
-                    return
-                chain = self.build_search_results_chain(videos, keyword)
-                yield event.chain_result(chain)
-            except Exception as e:
-                logger.error(f"搜索失败: {e}")
-                yield event.plain_result(f"❌ 搜索失败: {str(e)}")
-        elif action == "info":
-            if not remaining_args:
-                yield event.plain_result("❌ 请输入视频ID\n用法: xporn info <id>")
-                return
-            video_id = remaining_args[0]
-            yield event.plain_result(f"📄 正在获取视频详情: {video_id}...")
-            try:
-                video = await self.get_video_info(video_id)
-                if not video:
-                    yield event.plain_result("❌ 未找到该视频")
-                    return
-                yield event.plain_result(self.format_video_detail(video))
-            except Exception as e:
-                logger.error(f"获取视频详情失败: {e}")
-                yield event.plain_result(f"❌ 获取视频详情失败: {str(e)}")
         else:
             yield event.plain_result(
                 f"❌ 未知命令: {action}\n使用 'xporn help' 查看帮助"
             )
+
+    @filter.command("xporn_search", alias=["xp_search"])
+    async def xporn_search(self, event: AstrMessageEvent, keyword: str = ""):
+        """搜索视频命令"""
+        if not keyword or not keyword.strip():
+            yield event.plain_result("❌ 请输入搜索关键词\n用法: xporn_search <关键词>")
+            return
+
+        keyword = keyword.strip()
+        yield event.plain_result(f"🔍 正在搜索: {keyword}...")
+        try:
+            videos = await self.search_videos(keyword)
+            if not videos:
+                yield event.plain_result(f"❌ 未找到与 '{keyword}' 相关的视频")
+                return
+            chain = self.build_search_results_chain(videos, keyword)
+            yield event.chain_result(chain)
+        except Exception as e:
+            logger.error(f"搜索失败: {e}")
+            yield event.plain_result(f"❌ 搜索失败: {str(e)}")
+
+    @filter.command("xporn_info", alias=["xp_info"])
+    async def xporn_info(self, event: AstrMessageEvent, video_id: str = ""):
+        """获取视频详情命令"""
+        if not video_id or not video_id.strip():
+            yield event.plain_result("❌ 请输入视频ID\n用法: xporn_info <id>")
+            return
+
+        video_id = video_id.strip()
+        yield event.plain_result(f"📄 正在获取视频详情: {video_id}...")
+        try:
+            video = await self.get_video_info(video_id)
+            if not video:
+                yield event.plain_result("❌ 未找到该视频")
+                return
+            yield event.plain_result(self.format_video_detail(video))
+        except Exception as e:
+            logger.error(f"获取视频详情失败: {e}")
+            yield event.plain_result(f"❌ 获取视频详情失败: {str(e)}")
 
     def get_help_text(self) -> str:
         """获取帮助文本"""
@@ -174,14 +180,21 @@ class XPornPlugin(Star):
         return f"""
 📺 X-Porn 视频查询插件帮助
 
-命令列表:
+主命令列表:
   xporn              - 显示此帮助
   xporn rank [页码]  - 获取排行榜（按点赞，默认第1页）
   xporn views [页码]  - 获取排行榜（按观看数）
-  xporn search <关键词> - 搜索视频
   xporn hot          - 获取热门视频
   xporn random       - 随机推荐视频
-  xporn info <id>    - 获取视频详情
+
+独立命令列表:
+  xporn_search <关键词> - 搜索视频
+  xporn_info <id>      - 获取视频详情
+
+命令别名:
+  xp                - xporn 的简写
+  xp_search         - xporn_search 的简写
+  xp_info           - xporn_info 的简写
 
 当前设置:
   🎭 打码程度: {mosaic_desc}
@@ -191,7 +204,8 @@ class XPornPlugin(Star):
 示例:
   xporn rank         - 获取排行榜
   xporn rank 2       - 获取排行榜第2页
-  xporn search anime - 搜索动漫相关视频
+  xporn_search anime - 搜索动漫相关视频
+  xporn_info abc123  - 获取视频详情
 """
 
     # ========== 数据获取方法 ==========
