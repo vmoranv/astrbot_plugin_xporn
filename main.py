@@ -156,7 +156,9 @@ class XPornPlugin(Star):
     async def xporn_search(self, event: AstrMessageEvent, keyword: str = ""):
         """搜索视频命令"""
         if not keyword or not keyword.strip():
-            yield event.plain_result("❌ 请输入搜索关键词\n用法: xporn_search <关键词>\n💡 搜索 Twitter 账户名（如: mei, cc, jl 等）")
+            yield event.plain_result(
+                "❌ 请输入搜索关键词\n用法: xporn_search <关键词>\n💡 搜索 Twitter 账户名（如: mei, cc, jl 等）"
+            )
             return
 
         keyword = keyword.strip()
@@ -206,7 +208,7 @@ class XPornPlugin(Star):
         source_desc = {
             "twitter": "Twitter 真人视频",
             "anime": "动漫视频",
-            "mixed": "混合源（真人+动漫）"
+            "mixed": "混合源（真人+动漫）",
         }.get(data_source, data_source)
 
         return f"""
@@ -278,7 +280,7 @@ class XPornPlugin(Star):
                         continue
 
                     data = await resp.json()
-                    videos = self.parse_api_data(data)
+                    videos = self.parse_api_data(data, base_url)
                     all_videos.extend(videos)
             except Exception as e:
                 logger.error(f"请求失败 ({base_url}): {e}")
@@ -357,7 +359,7 @@ class XPornPlugin(Star):
                 async with self.session.get(url, params=params) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        videos = self.parse_api_data(data)
+                        videos = self.parse_api_data(data, base_url)
                         if videos:
                             return videos[0]
             except Exception as e:
@@ -365,7 +367,7 @@ class XPornPlugin(Star):
 
         return None
 
-    def parse_api_data(self, data: Optional[Dict]) -> List[Dict]:
+    def parse_api_data(self, data: Optional[Dict], base_url: str) -> List[Dict]:
         """解析 API 返回的视频数据"""
         if not data:
             logger.warning("API 返回数据为空")
@@ -388,7 +390,7 @@ class XPornPlugin(Star):
             duration = f"{minutes}:{seconds:02d}" if time_seconds > 0 else ""
 
             video = {
-                "url": f"{self.base_url}/movie/{item.get('url_cd', '')}",
+                "url": f"{base_url}/movie/{item.get('url_cd', '')}",
                 "movieId": item.get("url_cd", ""),
                 "title": item.get("tweet_account", "未知用户"),
                 "thumbnail": item.get("thumbnail", ""),
@@ -434,7 +436,7 @@ class XPornPlugin(Star):
             views = random.randint(10000, 500000)
 
             video = {
-                "url": f"{self.base_url}{url_path}",
+                "url": f"{self.base_urls[0]}{url_path}",
                 "movieId": movie_id,
                 "title": title_match.group(1)
                 if title_match
