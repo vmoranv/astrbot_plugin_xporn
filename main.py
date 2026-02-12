@@ -50,18 +50,26 @@ class XPornPlugin(Star):
     @filter.command("xporn", alias=["xp"])
     async def xporn_main(self, event: AstrMessageEvent, args: str = ""):
         """xporn 主命令"""
-        if not args:
-            yield event.plain_result(self.get_help_text())
-            return
+        # 调试日志：查看原始参数
+        logger.info(f"[DEBUG] 原始 args repr: {repr(args)} (len: {len(args) if args else 0})")
 
-        # 处理参数：按空格分割，但保留可能的空参数
-        parts = [p for p in args.strip().split() if p]  # 移除空字符串但保留其他参数
+        # 使用更健壮的方式分割参数
+        if args:
+            # 使用 split() 而不带参数，这会自动处理多个空格
+            parts = args.strip().split()
+        else:
+            parts = []
+
+        logger.info(f"[DEBUG] 解析后 parts: {parts}")
+
         if not parts:
             yield event.plain_result(self.get_help_text())
             return
 
         action = parts[0].lower()
-        remaining_args = parts[1:]
+        remaining_args = parts[1:] if len(parts) > 1 else []
+
+        logger.info(f"[DEBUG] action='{action}', remaining_args={remaining_args}, 长度={len(remaining_args)}")
 
         if action in ("help", "h"):
             yield event.plain_result(self.get_help_text())
