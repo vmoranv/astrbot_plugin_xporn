@@ -41,18 +41,26 @@ class XPornPlugin(Star):
         logger.info("XPorn 插件已卸载")
 
     @filter.command("xporn", alias=["xp"])
-    async def xporn_main(
-        self, event: AstrMessageEvent, action: str = "rank", *args: str
-    ):
+    async def xporn_main(self, event: AstrMessageEvent, *args: str):
         """xporn 主命令"""
-        action = action.lower()
+        # 如果没有参数，显示帮助
+        if not args:
+            yield event.plain_result(self.get_help_text())
+            return
+
+        action = args[0].lower()
+        remaining_args = args[1:]
 
         if action in ("help", "h"):
             yield event.plain_result(self.get_help_text())
             return
 
         if action == "rank":
-            page = int(args[0]) if args and args[0].isdigit() else 1
+            page = (
+                int(remaining_args[0])
+                if remaining_args and remaining_args[0].isdigit()
+                else 1
+            )
             yield event.plain_result("🔍 正在获取排行榜...")
             try:
                 videos = await self.fetch_ranking(page)
@@ -86,12 +94,12 @@ class XPornPlugin(Star):
                 logger.error(f"随机推荐失败: {e}")
                 yield event.plain_result(f"❌ 随机推荐失败: {str(e)}")
         elif action == "search":
-            if not args:
+            if not remaining_args:
                 yield event.plain_result(
                     "❌ 请输入搜索关键词\n用法: xporn search <关键词>"
                 )
                 return
-            keyword = " ".join(args)
+            keyword = " ".join(remaining_args)
             yield event.plain_result(f"🔍 正在搜索: {keyword}...")
             try:
                 videos = await self.search_videos(keyword)
@@ -103,10 +111,10 @@ class XPornPlugin(Star):
                 logger.error(f"搜索失败: {e}")
                 yield event.plain_result(f"❌ 搜索失败: {str(e)}")
         elif action == "info":
-            if not args:
+            if not remaining_args:
                 yield event.plain_result("❌ 请输入视频ID\n用法: xporn info <id>")
                 return
-            video_id = args[0]
+            video_id = remaining_args[0]
             yield event.plain_result(f"📄 正在获取视频详情: {video_id}...")
             try:
                 video = await self.get_video_info(video_id)
@@ -131,8 +139,8 @@ class XPornPlugin(Star):
 📺 X-Porn 视频查询插件帮助
 
 命令列表:
-  xporn help         - 显示此帮助
-  xporn rank [page]  - 获取排行榜 (默认第1页)
+  xporn              - 显示此帮助
+  xporn rank [页码]  - 获取排行榜 (默认第1页)
   xporn search <关键词> - 搜索视频
   xporn hot          - 获取热门视频
   xporn random       - 随机推荐视频
