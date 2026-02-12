@@ -2,6 +2,7 @@
 AstrBot X-Porn 插件
 提供 Twitter 视频排行视频查询功能
 命令前缀: xporn
+数据源: twitter-ero-video-ranking.com, x-ero-anime.com
 """
 
 import random
@@ -15,6 +16,13 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
 
+# 数据源配置
+DATA_SOURCES = {
+    "twitter": "https://twitter-ero-video-ranking.com",
+    "anime": "https://x-ero-anime.com",
+}
+
+
 @register("xporn", "vmoranv", "Twitter 视频排行查询插件", "1.0.0")
 class XPornPlugin(Star):
     """Twitter 视频排行查询插件"""
@@ -22,9 +30,16 @@ class XPornPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig) -> None:
         super().__init__(context)
         self.config = config
-        self.base_url = "https://twitter-ero-video-ranking.com"
         self.session: Optional[aiohttp.ClientSession] = None
         self.max_results: int = 10
+
+        # 获取数据源配置
+        data_source = config.get("data_source", "twitter")
+        if data_source == "mixed":
+            self.base_urls = list(DATA_SOURCES.values())
+        else:
+            self.base_urls = [DATA_SOURCES.get(data_source, DATA_SOURCES["twitter"])]
+        logger.info(f"XPorn 插件使用数据源: {self.base_urls}")
 
     async def initialize(self) -> None:
         """插件初始化，创建 HTTP 会话"""
@@ -141,7 +156,7 @@ class XPornPlugin(Star):
     async def xporn_search(self, event: AstrMessageEvent, keyword: str = ""):
         """搜索视频命令"""
         if not keyword or not keyword.strip():
-            yield event.plain_result("❌ 请输入搜索关键词\n用法: xporn_search <关键词>")
+            yield event.plain_result("❌ 请输入搜索关键词\n用法: xporn_search <关键词>\n💡 搜索 Twitter 账户名（如: mei, cc, jl 等）")
             return
 
         keyword = keyword.strip()
@@ -149,7 +164,12 @@ class XPornPlugin(Star):
         try:
             videos = await self.search_videos(keyword)
             if not videos:
-                yield event.plain_result(f"❌ 未找到与 '{keyword}' 相关的视频")
+                yield event.plain_result(
+                    f"❌ 未找到与 '{keyword}' 相关的视频\n"
+                    f"💡 搜索提示：\n"
+                    f"   • 搜索的是 Twitter 账户名（英文/数字）\n"
+                    f"   • 可尝试关键词: mei, cc, jl, hp, girl 等"
+                )
                 return
             chain = self.build_search_results_chain(videos, keyword)
             yield event.chain_result(chain)
@@ -182,6 +202,13 @@ class XPornPlugin(Star):
         mosaic_level = self.config.get("mosaic_level", 0)
         mosaic_desc = ["无", "轻微", "中度", "重度"][min(mosaic_level, 3)]
 
+        data_source = self.config.get("data_source", "twitter")
+        source_desc = {
+            "twitter": "Twitter 真人视频",
+            "anime": "动漫视频",
+            "mixed": "混合源（真人+动漫）"
+        }.get(data_source, data_source)
+
         return f"""
 📺 X-Porn 视频查询插件帮助
 
@@ -193,7 +220,7 @@ class XPornPlugin(Star):
   xporn random       - 随机推荐视频
 
 独立命令列表:
-  xporn_search <关键词> - 搜索视频
+  xporn_search <关键词> - 搜索 Twitter 账户名（英文/数字）
   xporn_info <id>      - 获取视频详情
 
 命令别名:
@@ -202,6 +229,7 @@ class XPornPlugin(Star):
   xp_info           - xporn_info 的简写
 
 当前设置:
+  📡 数据源: {source_desc}
   🎭 打码程度: {mosaic_desc}
   ⏱️ 请求超时: {self.config.get("request_timeout", 15)}秒
   📊 每页显示: {self.config.get("max_results", 10)}条
@@ -209,8 +237,10 @@ class XPornPlugin(Star):
 示例:
   xporn rank         - 获取排行榜
   xporn rank 2       - 获取排行榜第2页
-  xporn_search anime - 搜索动漫相关视频
+  xporn_search mei    - 搜索包含 'mei' 的账户
   xporn_info abc123  - 获取视频详情
+
+💡 提示: 可在插件设置中切换数据源 (twitter/anime/mixed)
 """
 
     # ========== 数据获取方法 ==========
@@ -222,27 +252,32 @@ class XPornPlugin(Star):
         if not self.session:
             return []
 
-        # 使用 API 获取视频数据
-        url = f"{self.base_url}/api/media"
-        params = {
-            "page": page,
-            "per_page": per_page or self.max_results,
-            "sort": sort,
-            "category": "",
-            "range": "",
-            "isAnimeOnly": 0,
-        }
-        try:
-            async with self.session.get(url, params=params) as resp:
-                if resp.status != 200:
-                    logger.error(f"HTTP 错误: {resp.status}")
-                    return []
+        all_videos = []
 
-                data = await resp.json()
-                return self.parse_api_data(data)
-        except Exception as e:
-            logger.error(f"请求失败: {e}")
-            return []
+        # 从所有配置的数据源获取数据
+        for base_url in self.base_urls:
+            url = f"{base_url}/api/media"
+            params = {
+                "page": page,
+                "per_page": per_page or self.max_results,
+                "sort": sort,
+                "category": "",
+                "range": "",
+                "isAnimeOnly": 0,
+            }
+            try:
+                async with self.session.get(url, params=params) as resp:
+                    if resp.status != 200:
+                        logger.error(f"HTTP 错误 ({base_url}): {resp.status}")
+                        continue
+
+                    data = await resp.json()
+                    videos = self.parse_api_data(data)
+                    all_videos.extend(videos)
+            except Exception as e:
+                logger.error(f"请求失败 ({base_url}): {e}")
+
+        return all_videos
 
     async def fetch_hot_videos(self) -> List[Dict]:
         """获取热门视频"""
@@ -252,15 +287,27 @@ class XPornPlugin(Star):
 
     async def search_videos(self, keyword: str) -> List[Dict]:
         """搜索视频"""
-        # 获取更多视频以进行搜索
-        videos = await self.fetch_ranking(page=1, per_page=150)
-        if not videos:
+        keyword = keyword.strip()
+        if not keyword:
             return []
 
-        keyword_lower = keyword.lower() if keyword else ""
+        # 获取更多页的数据进行搜索
+        all_videos = []
+        max_pages = 3  # 搜索前3页
+
+        for page in range(1, max_pages + 1):
+            videos = await self.fetch_ranking(page=page, per_page=150)
+            if not videos:
+                break
+            all_videos.extend(videos)
+
+        if not all_videos:
+            return []
+
+        keyword_lower = keyword.lower()
         results = []
 
-        for v in videos:
+        for v in all_videos:
             # 搜索标题（Twitter 账户名）
             title = v.get("title") or ""
             if keyword_lower in title.lower():
@@ -286,28 +333,29 @@ class XPornPlugin(Star):
             if video.get("movieId") == movie_id:
                 return video
 
-        # 如果没有找到，尝试通过单页API获取
+        # 如果没有找到，尝试通过单页API逐个源获取
         if not self.session:
             return None
 
-        url = f"{self.base_url}/api/media"
-        params = {
-            "ids": movie_id,
-            "per_page": 1,
-            "sort": "favorite",
-            "category": "",
-            "range": "",
-            "isAnimeOnly": 0,
-        }
-        try:
-            async with self.session.get(url, params=params) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    videos = self.parse_api_data(data)
-                    if videos:
-                        return videos[0]
-        except Exception as e:
-            logger.error(f"获取视频详情失败: {e}")
+        for base_url in self.base_urls:
+            url = f"{base_url}/api/media"
+            params = {
+                "ids": movie_id,
+                "per_page": 1,
+                "sort": "favorite",
+                "category": "",
+                "range": "",
+                "isAnimeOnly": 0,
+            }
+            try:
+                async with self.session.get(url, params=params) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        videos = self.parse_api_data(data)
+                        if videos:
+                            return videos[0]
+            except Exception as e:
+                logger.error(f"获取视频详情失败 ({base_url}): {e}")
 
         return None
 

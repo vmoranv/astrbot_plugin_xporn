@@ -1,4 +1,11 @@
 {
+  "data_source": {
+    "type": "string",
+    "description": "数据源",
+    "default": "twitter",
+    "obvious_hint": true,
+    "hint": "可选: twitter(只含真人视频), anime(只含动漫), mixed(混合)"
+  },
   "mosaic_level": {
     "type": "int",
     "description": "封面打码程度",
