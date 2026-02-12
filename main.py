@@ -9,8 +9,9 @@ import re
 from typing import Optional, List, Dict
 
 import aiohttp
+import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig, logger
-from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.event import AstrMessageEvent, filter, MessageChain
 from astrbot.api.star import Context, Star, register
 
 
@@ -53,8 +54,13 @@ class XPornPlugin(Star):
             yield event.plain_result(self.get_help_text())
             return
 
-        parts = args.strip().split()
-        action = parts[0].lower() if parts else ""
+        # 处理参数：按空格分割，但保留可能的空参数
+        parts = [p for p in args.strip().split() if p]  # 移除空字符串但保留其他参数
+        if not parts:
+            yield event.plain_result(self.get_help_text())
+            return
+
+        action = parts[0].lower()
         remaining_args = parts[1:]
 
         if action in ("help", "h"):
@@ -73,7 +79,8 @@ class XPornPlugin(Star):
                 if not videos:
                     yield event.plain_result("❌ 未找到视频数据")
                     return
-                yield event.make_result(self.format_ranking_with_images(videos, page))
+                chain = self.build_ranking_chain(videos, page)
+                yield event.chain_result(chain)
             except Exception as e:
                 logger.error(f"获取排行榜失败: {e}")
                 yield event.plain_result(f"❌ 获取排行榜失败: {str(e)}")
@@ -84,7 +91,8 @@ class XPornPlugin(Star):
                 if not videos:
                     yield event.plain_result("❌ 未找到热门视频")
                     return
-                yield event.make_result(self.format_hot_videos_with_images(videos))
+                chain = self.build_hot_videos_chain(videos)
+                yield event.chain_result(chain)
             except Exception as e:
                 logger.error(f"获取热门视频失败: {e}")
                 yield event.plain_result(f"❌ 获取热门视频失败: {str(e)}")
@@ -95,7 +103,8 @@ class XPornPlugin(Star):
                 if not videos:
                     yield event.plain_result("❌ 未找到视频数据")
                     return
-                yield event.make_result(self.format_ranking_with_images(videos, 1))
+                chain = self.build_ranking_chain(videos, 1)
+                yield event.chain_result(chain)
             except Exception as e:
                 logger.error(f"获取观看数排行榜失败: {e}")
                 yield event.plain_result(f"❌ 获取观看数排行榜失败: {str(e)}")
@@ -106,7 +115,8 @@ class XPornPlugin(Star):
                 if not video:
                     yield event.plain_result("❌ 随机推荐失败")
                     return
-                yield event.make_result(self.format_video_detail_with_image(video))
+                chain = self.build_video_detail_chain(video)
+                yield event.chain_result(chain)
             except Exception as e:
                 logger.error(f"随机推荐失败: {e}")
                 yield event.plain_result(f"❌ 随机推荐失败: {str(e)}")
@@ -123,7 +133,8 @@ class XPornPlugin(Star):
                 if not videos:
                     yield event.plain_result(f"❌ 未找到与 '{keyword}' 相关的视频")
                     return
-                yield event.make_result(self.format_search_results_with_images(videos, keyword))
+                chain = self.build_search_results_chain(videos, keyword)
+                yield event.chain_result(chain)
             except Exception as e:
                 logger.error(f"搜索失败: {e}")
                 yield event.plain_result(f"❌ 搜索失败: {str(e)}")
@@ -273,12 +284,23 @@ class XPornPlugin(Star):
 
         return None
 
-    def parse_api_data(self, data: Dict) -> List[Dict]:
+    def parse_api_data(self, data: Optional[Dict]) -> List[Dict]:
         """解析 API 返回的视频数据"""
+        if not data:
+            logger.warning("API 返回数据为空")
+            return []
+
         videos = []
         items = data.get("items", [])
 
+        if not items:
+            logger.warning(f"API 返回数据中没有 items，原始数据: {str(data)[:200]}")
+            return []
+
         for item in items:
+            if not item:
+                continue
+
             # 转换秒数到 mm:ss 格式
             time_seconds = item.get("time", 0)
             minutes, seconds = divmod(time_seconds, 60)
@@ -292,7 +314,7 @@ class XPornPlugin(Star):
                 "duration": duration,
                 "likes": int(item.get("favorite", 0)),
                 "views": int(item.get("pv", 0)),
-                "comments": int(item.get("_count", {}).get("comments", 0)),
+                "comments": int(item.get("_count", {}).get("comments", 0)) if item.get("_count") else 0,
                 "tweet_url": item.get("tweet_url", ""),
             }
             videos.append(video)
@@ -344,6 +366,102 @@ class XPornPlugin(Star):
             videos.append(video)
 
         return videos[:20]
+
+    # ========== 消息链构建方法 ==========
+
+    def build_ranking_chain(self, videos: List[Dict], page: int) -> List:
+        """构建排行榜消息链"""
+        display_videos = videos[: self.max_results]
+        chain = [Comp.Plain(f"📺 Twitter 视频排行榜 - 第 {page} 页")]
+
+        for i, video in enumerate(display_videos, 1):
+            title = video.get("title", "未知标题")[:20]
+            duration = video.get("duration", "--:--")
+            views = video.get("views", 0)
+            movie_id = video.get("movieId", "")
+            thumbnail = video.get("thumbnail", "")
+
+            info = f"\n{i}. {title}"
+            if duration:
+                info += f"\n   ⏱️ {duration}  👁️ {self.format_number(views)}"
+            if movie_id:
+                info += f"\n   🆔 {movie_id}"
+
+            chain.append(Comp.Plain(info))
+            if thumbnail:
+                chain.append(Comp.Image.fromURL(thumbnail))
+
+        chain.append(Comp.Plain("\n💡 使用 'xporn info <id>' 查看详情"))
+        return chain
+
+    def build_hot_videos_chain(self, videos: List[Dict]) -> List:
+        """构建热门视频消息链"""
+        chain = [Comp.Plain("🔥 热门视频推荐")]
+
+        for i, video in enumerate(videos[:8], 1):
+            title = video.get("title", "未知标题")[:18]
+            likes = video.get("likes", 0)
+            views = video.get("views", 0)
+            movie_id = video.get("movieId", "")
+            thumbnail = video.get("thumbnail", "")
+
+            info = f"\n{i}. {title}"
+            info += f"\n   ❤️ {self.format_number(likes)}  👁️ {self.format_number(views)}"
+            if movie_id:
+                info += f"\n   🆔 {movie_id}"
+
+            chain.append(Comp.Plain(info))
+            if thumbnail:
+                chain.append(Comp.Image.fromURL(thumbnail))
+
+        return chain
+
+    def build_search_results_chain(self, videos: List[Dict], keyword: str) -> List:
+        """构建搜索结果消息链"""
+        chain = [Comp.Plain(f"🔍 搜索结果: {keyword}")]
+
+        for i, video in enumerate(videos[:10], 1):
+            title = video.get("title", "未知标题")[:20]
+            duration = video.get("duration", "--:--")
+            movie_id = video.get("movieId", "")
+            thumbnail = video.get("thumbnail", "")
+
+            info = f"\n{i}. {title}"
+            if duration:
+                info += f"\n   ⏱️ {duration}"
+            if movie_id:
+                info += f"\n   🆔 {movie_id}"
+
+            chain.append(Comp.Plain(info))
+            if thumbnail:
+                chain.append(Comp.Image.fromURL(thumbnail))
+
+        return chain
+
+    def build_video_detail_chain(self, video: Dict) -> List:
+        """构建视频详情消息链"""
+        chain = [Comp.Plain("📄 视频详情")]
+
+        title = video.get("title", "未知标题")
+        chain.append(Comp.Plain(f"\n📌 标题: {title}"))
+
+        if video.get("duration"):
+            chain.append(Comp.Plain(f"⏱️ 时长: {video['duration']}"))
+        if video.get("views"):
+            chain.append(Comp.Plain(f"👁️ 观看: {self.format_number(video['views'])}"))
+        if video.get("likes"):
+            chain.append(Comp.Plain(f"❤️ 点赞: {self.format_number(video['likes'])}"))
+
+        if video.get("movieId"):
+            chain.append(Comp.Plain(f"\n🆔 ID: {video['movieId']}"))
+
+        if video.get("url"):
+            chain.append(Comp.Plain(f"\n🔗 链接: {video['url']}"))
+
+        if video.get("thumbnail"):
+            chain.append(Comp.Image.fromURL(video["thumbnail"]))
+
+        return chain
 
     # ========== 格式化方法 ==========
 
