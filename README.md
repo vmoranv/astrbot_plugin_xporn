@@ -4,7 +4,7 @@ Twitter 视频排行查询插件，支持获取排行榜、搜索、热门视频
 
 ## 功能
 
-- 📺 **排行榜** - 获取 Twitter 视频排行榜
+- 📺 **排行榜** - 获取 Twitter 视频排行榜（支持按点赞/观看数排序）
 - 🔍 **搜索** - 根据关键词搜索视频
 - 🔥 **热门** - 获取热门推荐视频
 - 🎲 **随机** - 随机推荐一个视频
@@ -15,8 +15,9 @@ Twitter 视频排行查询插件，支持获取排行榜、搜索、热门视频
 所有命令前缀为 `xporn` 或简写 `xp`：
 
 ```
-xporn help         # 显示帮助信息
-xporn rank [页码]  # 获取排行榜（默认第1页）
+xporn              # 显示帮助信息
+xporn rank [页码]  # 获取排行榜（默认第1页，按点赞排序）
+xporn views [页码]  # 获取排行榜（按观看数排序）
 xporn search <关键词>  # 搜索视频
 xporn hot          # 获取热门视频
 xporn random       # 随机推荐
@@ -26,12 +27,13 @@ xporn info <视频ID>  # 获取视频详情
 ## 示例
 
 ```
-xporn rank          # 获取排行榜第1页
-xporn rank 2        # 获取排行榜第2页
+xporn rank          # 获取按点赞排序的排行榜
+xporn rank 2        # 获取第2页
+xporn views         # 获取按观看数排序的排行榜
 xporn search anime  # 搜索动漫相关视频
 xporn hot           # 获取热门视频
 xporn random        # 随机推荐
-xporn info abc123   # 获取视频详情
+xporn info ObmorVDtQv8bZ5w6  # 获取视频详情
 ```
 
 ## 安装

@@ -88,6 +88,17 @@ class XPornPlugin(Star):
             except Exception as e:
                 logger.error(f"获取热门视频失败: {e}")
                 yield event.plain_result(f"❌ 获取热门视频失败: {str(e)}")
+        elif action == "views":
+            yield event.plain_result("👁️ 正在获取按观看数排序的排行榜...")
+            try:
+                videos = await self.fetch_ranking(sort="views")
+                if not videos:
+                    yield event.plain_result("❌ 未找到视频数据")
+                    return
+                yield event.plain_result(self.format_ranking(videos, 1))
+            except Exception as e:
+                logger.error(f"获取观看数排行榜失败: {e}")
+                yield event.plain_result(f"❌ 获取观看数排行榜失败: {str(e)}")
         elif action == "random":
             yield event.plain_result("🎲 正在随机推荐...")
             try:
@@ -146,7 +157,8 @@ class XPornPlugin(Star):
 
 命令列表:
   xporn              - 显示此帮助
-  xporn rank [页码]  - 获取排行榜 (默认第1页)
+  xporn rank [页码]  - 获取排行榜（按点赞，默认第1页）
+  xporn views [页码]  - 获取排行榜（按观看数）
   xporn search <关键词> - 搜索视频
   xporn hot          - 获取热门视频
   xporn random       - 随机推荐视频
@@ -165,20 +177,29 @@ class XPornPlugin(Star):
 
     # ========== 数据获取方法 ==========
 
-    async def fetch_ranking(self, page: int = 1) -> List[Dict]:
+    async def fetch_ranking(self, page: int = 1, sort: str = "favorite") -> List[Dict]:
         """获取排行榜视频"""
         if not self.session:
             return []
 
-        url = f"{self.base_url}/"
+        # 使用 API 获取视频数据
+        url = f"{self.base_url}/api/media"
+        params = {
+            "page": page,
+            "per_page": self.max_results,
+            "sort": sort,
+            "category": "",
+            "range": "",
+            "isAnimeOnly": 0
+        }
         try:
-            async with self.session.get(url) as resp:
+            async with self.session.get(url, params=params) as resp:
                 if resp.status != 200:
                     logger.error(f"HTTP 错误: {resp.status}")
                     return []
 
-                html = await resp.text()
-                return self.parse_video_list(html)
+                data = await resp.json()
+                return self.parse_api_data(data)
         except Exception as e:
             logger.error(f"请求失败: {e}")
             return []
@@ -191,25 +212,93 @@ class XPornPlugin(Star):
 
     async def search_videos(self, keyword: str) -> List[Dict]:
         """搜索视频"""
-        videos = await self.fetch_ranking()
+        # 获取更多视频以进行搜索
+        videos = await self.fetch_ranking(page=1, per_page=150)
+        if not videos:
+            return []
+
         keyword_lower = keyword.lower()
-        return [v for v in videos if keyword_lower in v.get("title", "").lower()]
+        results = []
+
+        for v in videos:
+            # 搜索标题（Twitter 账户名）
+            title = v.get("title", "")
+            if keyword_lower in title.lower():
+                results.append(v)
+                continue
+
+            # 搜索视频 ID
+            movie_id = v.get("movieId", "")
+            if keyword_lower in movie_id.lower():
+                results.append(v)
+
+        return results
 
     async def get_random_video(self) -> Optional[Dict]:
         """获取随机视频"""
-        videos = await self.fetch_ranking()
+        videos = await self.fetch_ranking(per_page=150)
         return random.choice(videos) if videos else None
 
     async def get_video_info(self, movie_id: str) -> Optional[Dict]:
         """获取视频详情"""
-        videos = await self.fetch_ranking()
+        videos = await self.fetch_ranking(per_page=150)
         for video in videos:
             if video.get("movieId") == movie_id:
                 return video
+
+        # 如果没有找到，尝试通过单页API获取
+        if not self.session:
+            return None
+
+        url = f"{self.base_url}/api/media"
+        params = {
+            "ids": movie_id,
+            "per_page": 1,
+            "sort": "favorite",
+            "category": "",
+            "range": "",
+            "isAnimeOnly": 0
+        }
+        try:
+            async with self.session.get(url, params=params) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    videos = self.parse_api_data(data)
+                    if videos:
+                        return videos[0]
+        except Exception as e:
+            logger.error(f"获取视频详情失败: {e}")
+
         return None
 
+    def parse_api_data(self, data: Dict) -> List[Dict]:
+        """解析 API 返回的视频数据"""
+        videos = []
+        items = data.get("items", [])
+
+        for item in items:
+            # 转换秒数到 mm:ss 格式
+            time_seconds = item.get("time", 0)
+            minutes, seconds = divmod(time_seconds, 60)
+            duration = f"{minutes}:{seconds:02d}" if time_seconds > 0 else ""
+
+            video = {
+                "url": f"{self.base_url}/movie/{item.get('url_cd', '')}",
+                "movieId": item.get("url_cd", ""),
+                "title": item.get("tweet_account", "未知用户"),
+                "thumbnail": item.get("thumbnail", ""),
+                "duration": duration,
+                "likes": int(item.get("favorite", 0)),
+                "views": int(item.get("pv", 0)),
+                "comments": int(item.get("_count", {}).get("comments", 0)),
+                "tweet_url": item.get("tweet_url", ""),
+            }
+            videos.append(video)
+
+        return videos
+
     def parse_video_list(self, html: str) -> List[Dict]:
-        """解析视频列表"""
+        """解析视频列表 (备用)"""
         videos = []
 
         movie_pattern = re.compile(r'href="(/movie/([a-zA-Z0-9_-]+))"')
