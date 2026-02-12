@@ -73,7 +73,7 @@ class XPornPlugin(Star):
                 if not videos:
                     yield event.plain_result("❌ 未找到视频数据")
                     return
-                yield event.plain_result(self.format_ranking(videos, page))
+                yield event.make_result(self.format_ranking_with_images(videos, page))
             except Exception as e:
                 logger.error(f"获取排行榜失败: {e}")
                 yield event.plain_result(f"❌ 获取排行榜失败: {str(e)}")
@@ -84,7 +84,7 @@ class XPornPlugin(Star):
                 if not videos:
                     yield event.plain_result("❌ 未找到热门视频")
                     return
-                yield event.plain_result(self.format_hot_videos(videos))
+                yield event.make_result(self.format_hot_videos_with_images(videos))
             except Exception as e:
                 logger.error(f"获取热门视频失败: {e}")
                 yield event.plain_result(f"❌ 获取热门视频失败: {str(e)}")
@@ -95,7 +95,7 @@ class XPornPlugin(Star):
                 if not videos:
                     yield event.plain_result("❌ 未找到视频数据")
                     return
-                yield event.plain_result(self.format_ranking(videos, 1))
+                yield event.make_result(self.format_ranking_with_images(videos, 1))
             except Exception as e:
                 logger.error(f"获取观看数排行榜失败: {e}")
                 yield event.plain_result(f"❌ 获取观看数排行榜失败: {str(e)}")
@@ -106,7 +106,7 @@ class XPornPlugin(Star):
                 if not video:
                     yield event.plain_result("❌ 随机推荐失败")
                     return
-                yield event.plain_result(self.format_video_detail(video))
+                yield event.make_result(self.format_video_detail_with_image(video))
             except Exception as e:
                 logger.error(f"随机推荐失败: {e}")
                 yield event.plain_result(f"❌ 随机推荐失败: {str(e)}")
@@ -123,7 +123,7 @@ class XPornPlugin(Star):
                 if not videos:
                     yield event.plain_result(f"❌ 未找到与 '{keyword}' 相关的视频")
                     return
-                yield event.plain_result(self.format_search_results(videos, keyword))
+                yield event.make_result(self.format_search_results_with_images(videos, keyword))
             except Exception as e:
                 logger.error(f"搜索失败: {e}")
                 yield event.plain_result(f"❌ 搜索失败: {str(e)}")
@@ -177,7 +177,9 @@ class XPornPlugin(Star):
 
     # ========== 数据获取方法 ==========
 
-    async def fetch_ranking(self, page: int = 1, sort: str = "favorite") -> List[Dict]:
+    async def fetch_ranking(
+        self, page: int = 1, sort: str = "favorite", per_page: int = None
+    ) -> List[Dict]:
         """获取排行榜视频"""
         if not self.session:
             return []
@@ -186,7 +188,7 @@ class XPornPlugin(Star):
         url = f"{self.base_url}/api/media"
         params = {
             "page": page,
-            "per_page": self.max_results,
+            "per_page": per_page or self.max_results,
             "sort": sort,
             "category": "",
             "range": "",
@@ -349,8 +351,7 @@ class XPornPlugin(Star):
         """格式化排行榜"""
         display_videos = videos[: self.max_results]
 
-        lines = [f"📺 Twitter 视频排行榜 - 第 {page} 页\n"]
-        lines.append("=" * 40)
+        lines = [f"📺 Twitter 视频排行榜 - 第 {page} 页"]
 
         for i, video in enumerate(display_videos, 1):
             title = video.get("title", "未知标题")[:20]
@@ -364,14 +365,37 @@ class XPornPlugin(Star):
             if movie_id:
                 lines.append(f"   🆔 {movie_id}")
 
-        lines.append(f"\n{'=' * 40}")
-        lines.append("💡 使用 'xporn info <id>' 查看详情")
+        lines.append("\n💡 使用 'xporn info <id>' 查看详情")
         return "\n".join(lines)
+
+    def format_ranking_with_images(self, videos: List[Dict], page: int) -> List[str]:
+        """格式化排行榜（带图片）"""
+        display_videos = videos[: self.max_results]
+        result = [f"📺 Twitter 视频排行榜 - 第 {page} 页"]
+
+        for i, video in enumerate(display_videos, 1):
+            title = video.get("title", "未知标题")[:20]
+            duration = video.get("duration", "--:--")
+            views = video.get("views", 0)
+            movie_id = video.get("movieId", "")
+            thumbnail = video.get("thumbnail", "")
+
+            info = f"{i}. {title}"
+            if duration:
+                info += f"\n   ⏱️ {duration}  👁️ {self.format_number(views)}"
+            if movie_id:
+                info += f"\n   🆔 {movie_id}"
+
+            result.append(info)
+            if thumbnail:
+                result.append(thumbnail)
+
+        result.append("\n💡 使用 'xporn info <id>' 查看详情")
+        return result
 
     def format_hot_videos(self, videos: List[Dict]) -> str:
         """格式化热门视频"""
-        lines = ["🔥 热门视频推荐\n"]
-        lines.append("=" * 40)
+        lines = ["🔥 热门视频推荐"]
 
         for i, video in enumerate(videos[:8], 1):
             title = video.get("title", "未知标题")[:18]
@@ -386,13 +410,33 @@ class XPornPlugin(Star):
             if movie_id:
                 lines.append(f"   🆔 {movie_id}")
 
-        lines.append(f"\n{'=' * 40}")
         return "\n".join(lines)
+
+    def format_hot_videos_with_images(self, videos: List[Dict]) -> List[str]:
+        """格式化热门视频（带图片）"""
+        result = ["🔥 热门视频推荐"]
+
+        for i, video in enumerate(videos[:8], 1):
+            title = video.get("title", "未知标题")[:18]
+            likes = video.get("likes", 0)
+            views = video.get("views", 0)
+            movie_id = video.get("movieId", "")
+            thumbnail = video.get("thumbnail", "")
+
+            info = f"{i}. {title}"
+            info += f"\n   ❤️ {self.format_number(likes)}  👁️ {self.format_number(views)}"
+            if movie_id:
+                info += f"\n   🆔 {movie_id}"
+
+            result.append(info)
+            if thumbnail:
+                result.append(thumbnail)
+
+        return result
 
     def format_search_results(self, videos: List[Dict], keyword: str) -> str:
         """格式化搜索结果"""
-        lines = [f"🔍 搜索结果: {keyword}\n"]
-        lines.append("=" * 40)
+        lines = [f"🔍 搜索结果: {keyword}"]
 
         for i, video in enumerate(videos[:10], 1):
             title = video.get("title", "未知标题")[:20]
@@ -405,8 +449,29 @@ class XPornPlugin(Star):
             if movie_id:
                 lines.append(f"   🆔 {movie_id}")
 
-        lines.append(f"\n{'=' * 40}")
         return "\n".join(lines)
+
+    def format_search_results_with_images(self, videos: List[Dict], keyword: str) -> List[str]:
+        """格式化搜索结果（带图片）"""
+        result = [f"🔍 搜索结果: {keyword}"]
+
+        for i, video in enumerate(videos[:10], 1):
+            title = video.get("title", "未知标题")[:20]
+            duration = video.get("duration", "--:--")
+            movie_id = video.get("movieId", "")
+            thumbnail = video.get("thumbnail", "")
+
+            info = f"{i}. {title}"
+            if duration:
+                info += f"\n   ⏱️ {duration}"
+            if movie_id:
+                info += f"\n   🆔 {movie_id}"
+
+            result.append(info)
+            if thumbnail:
+                result.append(thumbnail)
+
+        return result
 
     def format_video_detail(self, video: Dict) -> str:
         """格式化视频详情"""
@@ -437,6 +502,31 @@ class XPornPlugin(Star):
         lines.append(f"\n{'=' * 40}")
         lines.append("💡 在浏览器中打开链接观看")
         return "\n".join(lines)
+
+    def format_video_detail_with_image(self, video: Dict) -> List[str]:
+        """格式化视频详情（带图片）"""
+        result = ["📄 视频详情"]
+
+        title = video.get("title", "未知标题")
+        result.append(f"\n📌 标题: {title}")
+
+        if video.get("duration"):
+            result.append(f"⏱️ 时长: {video['duration']}")
+        if video.get("views"):
+            result.append(f"👁️ 观看: {self.format_number(video['views'])}")
+        if video.get("likes"):
+            result.append(f"❤️ 点赞: {self.format_number(video['likes'])}")
+
+        if video.get("movieId"):
+            result.append(f"\n🆔 ID: {video['movieId']}")
+
+        if video.get("url"):
+            result.append(f"\n🔗 链接: {video['url']}")
+
+        if video.get("thumbnail"):
+            result.append(video["thumbnail"])
+
+        return result
 
     def format_number(self, num: int) -> str:
         """格式化数字"""
