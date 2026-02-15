@@ -385,22 +385,23 @@ class XPornPlugin(Star):
                 continue
 
             # 转换秒数到 mm:ss 格式
-            time_seconds = item.get("time", 0)
+            time_seconds = int(item.get("time") or 0)
             minutes, seconds = divmod(time_seconds, 60)
             duration = f"{minutes}:{seconds:02d}" if time_seconds > 0 else ""
 
+            url_cd = item.get("url_cd") or ""
+            tweet_account = item.get("tweet_account") or "未知用户"
+
             video = {
-                "url": f"{base_url}/movie/{item.get('url_cd', '')}",
-                "movieId": item.get("url_cd", ""),
-                "title": item.get("tweet_account", "未知用户"),
-                "thumbnail": item.get("thumbnail", ""),
+                "url": f"{base_url}/movie/{url_cd}",
+                "movieId": url_cd,
+                "title": tweet_account,
+                "thumbnail": item.get("thumbnail") or "",
                 "duration": duration,
-                "likes": int(item.get("favorite", 0)),
-                "views": int(item.get("pv", 0)),
-                "comments": int(item.get("_count", {}).get("comments", 0))
-                if item.get("_count")
-                else 0,
-                "tweet_url": item.get("tweet_url", ""),
+                "likes": int(item.get("favorite") or 0),
+                "views": int(item.get("pv") or 0),
+                "comments": int((item.get("_count") or {}).get("comments") or 0),
+                "tweet_url": item.get("tweet_url") or "",
             }
             videos.append(video)
 
@@ -460,7 +461,7 @@ class XPornPlugin(Star):
         chain = [Comp.Plain(f"📺 Twitter 视频排行榜 - 第 {page} 页")]
 
         for i, video in enumerate(display_videos, 1):
-            title = video.get("title", "未知标题")[:20]
+            title = str(video.get("title") or "未知标题")[:20]
             duration = video.get("duration", "--:--")
             views = video.get("views", 0)
             movie_id = video.get("movieId", "")
@@ -487,7 +488,7 @@ class XPornPlugin(Star):
         chain = [Comp.Plain("🔥 热门视频推荐")]
 
         for i, video in enumerate(videos[:8], 1):
-            title = video.get("title", "未知标题")[:18]
+            title = str(video.get("title") or "未知标题")[:18]
             likes = video.get("likes", 0)
             views = video.get("views", 0)
             movie_id = video.get("movieId", "")
@@ -512,7 +513,7 @@ class XPornPlugin(Star):
         chain = [Comp.Plain(f"🔍 搜索结果: {keyword}")]
 
         for i, video in enumerate(videos[:10], 1):
-            title = video.get("title", "未知标题")[:20]
+            title = str(video.get("title") or "未知标题")[:20]
             duration = video.get("duration", "--:--")
             movie_id = video.get("movieId", "")
             thumbnail = video.get("thumbnail", "")
@@ -541,7 +542,7 @@ class XPornPlugin(Star):
             chain.append(Comp.Image.fromURL(video["thumbnail"]))
 
         # 再添加标题
-        title = video.get("title", "未知标题")
+        title = str(video.get("title") or "未知标题")
         chain.append(Comp.Plain(f"📄 视频详情\n📌 标题: {title}"))
 
         # 添加其他信息
@@ -569,7 +570,7 @@ class XPornPlugin(Star):
         lines = [f"📺 Twitter 视频排行榜 - 第 {page} 页"]
 
         for i, video in enumerate(display_videos, 1):
-            title = video.get("title", "未知标题")[:20]
+            title = str(video.get("title") or "未知标题")[:20]
             duration = video.get("duration", "--:--")
             views = video.get("views", 0)
             movie_id = video.get("movieId", "")
@@ -589,7 +590,7 @@ class XPornPlugin(Star):
         result = [f"📺 Twitter 视频排行榜 - 第 {page} 页"]
 
         for i, video in enumerate(display_videos, 1):
-            title = video.get("title", "未知标题")[:20]
+            title = str(video.get("title") or "未知标题")[:20]
             duration = video.get("duration", "--:--")
             views = video.get("views", 0)
             movie_id = video.get("movieId", "")
@@ -613,7 +614,7 @@ class XPornPlugin(Star):
         lines = ["🔥 热门视频推荐"]
 
         for i, video in enumerate(videos[:8], 1):
-            title = video.get("title", "未知标题")[:18]
+            title = str(video.get("title") or "未知标题")[:18]
             likes = video.get("likes", 0)
             views = video.get("views", 0)
             movie_id = video.get("movieId", "")
@@ -632,7 +633,7 @@ class XPornPlugin(Star):
         result = ["🔥 热门视频推荐"]
 
         for i, video in enumerate(videos[:8], 1):
-            title = video.get("title", "未知标题")[:18]
+            title = str(video.get("title") or "未知标题")[:18]
             likes = video.get("likes", 0)
             views = video.get("views", 0)
             movie_id = video.get("movieId", "")
@@ -654,7 +655,7 @@ class XPornPlugin(Star):
         lines = [f"🔍 搜索结果: {keyword}"]
 
         for i, video in enumerate(videos[:10], 1):
-            title = video.get("title", "未知标题")[:20]
+            title = str(video.get("title") or "未知标题")[:20]
             duration = video.get("duration", "--:--")
             movie_id = video.get("movieId", "")
 
@@ -673,7 +674,7 @@ class XPornPlugin(Star):
         result = [f"🔍 搜索结果: {keyword}"]
 
         for i, video in enumerate(videos[:10], 1):
-            title = video.get("title", "未知标题")[:20]
+            title = str(video.get("title") or "未知标题")[:20]
             duration = video.get("duration", "--:--")
             movie_id = video.get("movieId", "")
             thumbnail = video.get("thumbnail", "")
@@ -695,7 +696,7 @@ class XPornPlugin(Star):
         lines = ["📄 视频详情"]
         lines.append("=" * 40)
 
-        title = video.get("title", "未知标题")
+        title = str(video.get("title") or "未知标题")
         lines.append(f"\n📌 标题: {title}")
 
         if video.get("duration"):
@@ -724,7 +725,7 @@ class XPornPlugin(Star):
         """格式化视频详情（带图片）"""
         result = ["📄 视频详情"]
 
-        title = video.get("title", "未知标题")
+        title = str(video.get("title") or "未知标题")
         result.append(f"\n📌 标题: {title}")
 
         if video.get("duration"):
@@ -747,6 +748,7 @@ class XPornPlugin(Star):
 
     def format_number(self, num: int) -> str:
         """格式化数字"""
+        num = int(num or 0)
         if num >= 10000:
             return f"{num / 10000:.1f}万"
         if num >= 1000:
